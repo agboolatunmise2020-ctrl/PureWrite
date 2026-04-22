@@ -1,75 +1,62 @@
 import telebot
 from telebot import types
-import g4f  # This handles the free AI rewriting
 
-# INSERT YOUR REAL TOKEN BELOW
+# 1. INSERT YOUR REAL TOKEN BELOW
+# Keep the quote ' on the SAME line as the token!
 API_TOKEN = '7971769630:AAHJRyN3AgtJvb0zg8HZx6EEWwSW94V81iw'
+
 bot = telebot.TeleBot(API_TOKEN)
+user_texts = {}
 
-user_data = {}
-
-def get_main_menu():
+def get_format_menu():
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
-        types.InlineKeyboardButton("👔 Professional", callback_data="tone_pro"),
-        types.InlineKeyboardButton("🍃 Simple English", callback_data="tone_simple"),
-        types.InlineKeyboardButton("🎨 Creative", callback_data="tone_creative"),
-        types.InlineKeyboardButton("🛠️ Fix Grammar", callback_data="tone_fix"),
-        types.InlineKeyboardButton("❓ Help", callback_data="get_help")
+        types.InlineKeyboardButton("UPPERCASE", callback_data="fmt_upper"),
+        types.InlineKeyboardButton("lowercase", callback_data="fmt_lower"),
+        types.InlineKeyboardButton("Title Case", callback_data="fmt_title"),
+        types.InlineKeyboardButton("sWaP cAsE", callback_data="fmt_swap"),
+        types.InlineKeyboardButton("❓ Help", callback_data="fmt_help")
     )
     return markup
 
 @bot.message_handler(commands=['start', 'help'])
-def send_welcome(message):
-    welcome_text = "✨ RePhrase AI is Ready\n\nSend me any text you want to rewrite, then choose a tone below."
-    bot.send_message(message.chat.id, welcome_text, reply_markup=get_main_menu())
+def start(message):
+    welcome = (
+        "✨ *PureWrite is Ready*\n\n"
+        "Send me any text or sentence, and I will format it for you instantly."
+    )
+    bot.send_message(message.chat.id, welcome, parse_mode="Markdown", reply_markup=get_format_menu())
 
 @bot.message_handler(func=lambda message: True)
-def handle_text(message):
-    user_data[message.chat.id] = message.text
-    bot.send_message(message.chat.id, "Select the desired tone for your text:", reply_markup=get_main_menu())
+def save_text(message):
+    user_texts[message.chat.id] = message.text
+    bot.send_message(message.chat.id, "Choose a format for your text:", reply_markup=get_format_menu())
 
 @bot.callback_query_handler(func=lambda call: True)
-def handle_query(call):
+def handle_format(call):
     chat_id = call.message.chat.id
+    original = user_texts.get(chat_id)
 
-    if call.data == "get_help":
+    if call.data == "fmt_help":
         bot.answer_callback_query(call.id)
-        bot.send_message(chat_id, "Instructions: Type your sentence first, then tap a tone button to rewrite it!")
+        bot.send_message(chat_id, "Type your sentence first, then click a button to change how the letters look!")
         return
 
-    if call.data.startswith('tone_'):
-        original_text = user_data.get(chat_id)
-        if not original_text:
-            bot.answer_callback_query(call.id, "Please send text first!", show_alert=True)
-            return
+    if not original:
+        bot.answer_callback_query(call.id, "Please send some text first!", show_alert=True)
+        return
 
-        bot.answer_callback_query(call.id, "AI is rewriting...")
-        
-        tones = {"pro": "Professional", "simple": "Simple English", "creative": "Creative", "fix": "Grammar correction"}
-        selected_tone = tones.get(call.data.split('_')[1])
+    bot.answer_callback_query(call.id, "Processing...")
 
-        try:
-            # The AI Logic
-            response = g4f.ChatCompletion.create(
-                model="gpt-3.5-turbo",
-                messages=[{"role": "user", "content": f"Paraphrase the following text in a {selected_tone} tone. Keep it human-like and simple: {original_text}"}],
-            )
-            
-            result = f"✅ REWRITTEN ({selected_tone}):\n\n{response}"
-        except Exception:
-            result = "⚠️ AI is busy. Please try again in a moment."
+    if call.data == "fmt_upper":
+        result = original.upper()
+    elif call.data == "fmt_lower":
+        result = original.lower()
+    elif call.data == "fmt_title":
+        result = original.title()
+    elif call.data == "fmt_swap":
+        result = original.swapcase()
 
-        feedback_markup = types.InlineKeyboardMarkup()
-        feedback_markup.add(
-            types.InlineKeyboardButton("Helpful 👍", callback_data="feedback_good"),
-            types.InlineKeyboardButton("Not Helpful 👎", callback_data="feedback_bad")
-        )
-        
-        bot.send_message(chat_id, result, reply_markup=feedback_markup)
-
-    elif call.data.startswith('feedback_'):
-        bot.answer_callback_query(call.id, "Feedback received!")
-        bot.edit_message_text("Thanks! We'll use your feedback to improve.", chat_id, call.message.message_id)
+    bot.send_message(chat_id, f"✅ *Formatted Text:*\n\n`{result}`", parse_mode="Markdown")
 
 bot.polling()
