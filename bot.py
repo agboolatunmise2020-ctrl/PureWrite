@@ -1,8 +1,10 @@
 import telebot
 from telebot import types
+import g4f  # This handles the free AI rewriting
 
 # INSERT YOUR REAL TOKEN BELOW
-API_TOKEN = '7971769630:AAHJRyN3AgtJvb0zg8HZx6EEWwSW94V81iw'
+API_TOKEN = '7971769630:AAHJRyN3AgtJvb0zg8HZx6EEWwSW94V81iw
+'
 bot = telebot.TeleBot(API_TOKEN)
 
 user_data = {}
@@ -34,7 +36,7 @@ def handle_query(call):
 
     if call.data == "get_help":
         bot.answer_callback_query(call.id)
-        bot.send_message(chat_id, "Instructions: Type your sentence first, then tap a tone button to see the magic!")
+        bot.send_message(chat_id, "Instructions: Type your sentence first, then tap a tone button to rewrite it!")
         return
 
     if call.data.startswith('tone_'):
@@ -43,15 +45,22 @@ def handle_query(call):
             bot.answer_callback_query(call.id, "Please send text first!", show_alert=True)
             return
 
-        bot.answer_callback_query(call.id, "Rewriting...")
+        bot.answer_callback_query(call.id, "AI is rewriting...")
         
-        # Mapping the tones for the display
-        tones = {"pro": "Professional", "simple": "Simple English", "creative": "Creative", "fix": "Grammar Fix"}
-        selected_tone = tones.get(call.data.split('_')[1], "Selected Tone")
+        tones = {"pro": "Professional", "simple": "Simple English", "creative": "Creative", "fix": "Grammar correction"}
+        selected_tone = tones.get(call.data.split('_')[1])
 
-        # Result display (Clean text to avoid 400 errors)
-        result = f"✅ REWRITTEN VERSION ({selected_tone}):\n\n[Your rewritten text for: '{original_text}' will appear here.]"
-        
+        try:
+            # The AI Logic
+            response = g4f.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": f"Paraphrase the following text in a {selected_tone} tone. Keep it human-like and simple: {original_text}"}],
+            )
+            
+            result = f"✅ REWRITTEN ({selected_tone}):\n\n{response}"
+        except Exception:
+            result = "⚠️ AI is busy. Please try again in a moment."
+
         feedback_markup = types.InlineKeyboardMarkup()
         feedback_markup.add(
             types.InlineKeyboardButton("Helpful 👍", callback_data="feedback_good"),
