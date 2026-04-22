@@ -1,7 +1,8 @@
 import telebot
 from telebot import types
 
-API_TOKEN = '7971769630:AAHJRyN3AgtJvb0zg8HZx6EEWwSW94V81iw' # Ensure your token is here!
+# INSERT YOUR REAL TOKEN BELOW
+API_TOKEN = 'YOUR_BOT_TOKEN'
 bot = telebot.TeleBot(API_TOKEN)
 
 user_data = {}
@@ -19,11 +20,8 @@ def get_main_menu():
 
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
-    welcome_text = (
-        "✨ *RePhrase AI is Ready*\n\n"
-        "Send me any text you want to rewrite, then choose a tone below."
-    )
-    bot.send_message(message.chat.id, welcome_text, parse_mode="Markdown", reply_markup=get_main_menu())
+    welcome_text = "✨ RePhrase AI is Ready\n\nSend me any text you want to rewrite, then choose a tone below."
+    bot.send_message(message.chat.id, welcome_text, reply_markup=get_main_menu())
 
 @bot.message_handler(func=lambda message: True)
 def handle_text(message):
@@ -36,7 +34,7 @@ def handle_query(call):
 
     if call.data == "get_help":
         bot.answer_callback_query(call.id)
-        bot.send_message(chat_id, "Simply type your sentence and click a tone button to rewrite it!")
+        bot.send_message(chat_id, "Instructions: Type your sentence first, then tap a tone button to see the magic!")
         return
 
     if call.data.startswith('tone_'):
@@ -45,10 +43,14 @@ def handle_query(call):
             bot.answer_callback_query(call.id, "Please send text first!", show_alert=True)
             return
 
-        bot.answer_callback_query(call.id, "Processing...")
+        bot.answer_callback_query(call.id, "Rewriting...")
         
-        # Result logic
-        result = f"✅ *Rewritten Version:*\n\nYour new text will appear here based on the {call.data} selection."
+        # Mapping the tones for the display
+        tones = {"pro": "Professional", "simple": "Simple English", "creative": "Creative", "fix": "Grammar Fix"}
+        selected_tone = tones.get(call.data.split('_')[1], "Selected Tone")
+
+        # Result display (Clean text to avoid 400 errors)
+        result = f"✅ REWRITTEN VERSION ({selected_tone}):\n\n[Your rewritten text for: '{original_text}' will appear here.]"
         
         feedback_markup = types.InlineKeyboardMarkup()
         feedback_markup.add(
@@ -56,10 +58,10 @@ def handle_query(call):
             types.InlineKeyboardButton("Not Helpful 👎", callback_data="feedback_bad")
         )
         
-        bot.send_message(chat_id, result, parse_mode="Markdown", reply_markup=feedback_markup)
+        bot.send_message(chat_id, result, reply_markup=feedback_markup)
 
     elif call.data.startswith('feedback_'):
-        bot.answer_callback_query(call.id, "Feedback saved!")
-        bot.edit_message_text("Thanks for helping us improve!", chat_id, call.message.message_id)
+        bot.answer_callback_query(call.id, "Feedback received!")
+        bot.edit_message_text("Thanks! We'll use your feedback to improve.", chat_id, call.message.message_id)
 
 bot.polling()
