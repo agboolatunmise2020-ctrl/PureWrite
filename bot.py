@@ -1,26 +1,20 @@
 import os
 import logging
+import asyncio
 import sys
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes, ConversationHandler
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, ConversationHandler
 
-# --- LOGGING SETUP ---
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO,
-    handlers=[logging.StreamHandler(sys.stdout)]
-)
+# Logging
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# --- CONFIGURATION ---
 TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL_LINK = os.getenv("CHANNEL_LINK", "https://t.me/gladiatorsofgold")
 
-# Stages
 STEP_ONE, STEP_TWO = range(2)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    logger.info("Start command triggered")
     keyboard = [[InlineKeyboardButton("👉 دخول", callback_data="go_to_step2")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     text = (
@@ -30,13 +24,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     if update.message:
         await update.message.reply_text(text, reply_markup=reply_markup)
+    else:
+        await update.callback_query.edit_message_text(text, reply_markup=reply_markup)
     return STEP_ONE
 
 async def step_two(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    logger.info("Moving to Step 2")
-    
     keyboard = [[InlineKeyboardButton("👉 فتح الوصول", callback_data="go_to_step3")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     text = (
@@ -52,32 +46,32 @@ async def step_two(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def step_three(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    logger.info("Final link delivered")
-    
     keyboard = [[InlineKeyboardButton("👉 دخول القناة", url=CHANNEL_LINK)]]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    text = "اضغط للدخول الآن 👇"
-    await query.edit_message_text(text, reply_markup=reply_markup)
+    await query.edit_message_text("اضغط للدخول الآن 👇", reply_markup=reply_markup)
     return ConversationHandler.END
 
-if __name__ == '__main__':
+def main():
     if not TOKEN:
-        logger.error("No BOT_TOKEN provided! Exiting.")
-        sys.exit(1)
+        print("BOT_TOKEN missing!")
+        return
 
-    logger.info("Initializing Application...")
-    app = ApplicationBuilder().token(TOKEN).build()
+    # Build the application
+    application = Application.builder().token(TOKEN).build()
 
     conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('start', start)],
+        entry_points=[CommandHandler("start", start)],
         states={
-            STEP_ONE: [CallbackQueryHandler(step_two, pattern='^go_to_step2$')],
-            STEP_TWO: [CallbackQueryHandler(step_three, pattern='^go_to_step3$')],
+            STEP_ONE: [CallbackQueryHandler(step_two, pattern="^go_to_step2$")],
+            STEP_TWO: [CallbackQueryHandler(step_three, pattern="^go_to_step3$")],
         },
-        fallbacks=[CommandHandler('start', start)],
+        fallbacks=[CommandHandler("start", start)],
     )
 
-    app.add_handler(conv_handler)
+    application.add_handler(conv_handler)
     
-    logger.info("Bot is polling. Send /start to your bot in Telegram.")
-    app.run_polling()
+    print("Bot starting stable polling...")
+    application.run_polling()
+
+if __name__ == "__main__":
+    main()
