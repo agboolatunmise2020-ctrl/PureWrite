@@ -1,62 +1,69 @@
-import telebot
-from telebot import types
+import os
+import logging
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes, ConversationHandler
 
-# 1. INSERT YOUR REAL TOKEN BELOW
-# Keep the quote ' on the SAME line as the token!
-API_TOKEN = '7971769630:AAHJRyN3AgtJvb0zg8HZx6EEWwSW94V81iw'
+# --- CONFIGURATION FROM ENVIRONMENT ---
+TOKEN = os.getenv("BOT_TOKEN")
+CHANNEL_LINK = os.getenv("CHANNEL_LINK", "https://t.me/gladiatorsofgold")
 
-bot = telebot.TeleBot(API_TOKEN)
-user_texts = {}
+# Stages
+STEP_ONE, STEP_TWO = range(2)
 
-def get_format_menu():
-    markup = types.InlineKeyboardMarkup(row_width=2)
-    markup.add(
-        types.InlineKeyboardButton("UPPERCASE", callback_data="fmt_upper"),
-        types.InlineKeyboardButton("lowercase", callback_data="fmt_lower"),
-        types.InlineKeyboardButton("Title Case", callback_data="fmt_title"),
-        types.InlineKeyboardButton("sWaP cAsE", callback_data="fmt_swap"),
-        types.InlineKeyboardButton("❓ Help", callback_data="fmt_help")
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = [[InlineKeyboardButton("👉 دخول", callback_data="go_to_step2")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    text = (
+        "أنت على بعد خطوة من فهم كيف نتداول الذهب بشكل احترافي 📊\n"
+        "كل صفقة نشرحها قبل الدخول (مش إشارات عشوائية)\n\n"
+        "جاهز تشوف بنفسك؟"
     )
-    return markup
+    if update.message:
+        await update.message.reply_text(text, reply_markup=reply_markup)
+    else:
+        await update.callback_query.edit_message_text(text, reply_markup=reply_markup)
+    return STEP_ONE
 
-@bot.message_handler(commands=['start', 'help'])
-def start(message):
-    welcome = (
-        "✨ *PureWrite is Ready*\n\n"
-        "Send me any text or sentence, and I will format it for you instantly."
+async def step_two(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    keyboard = [[InlineKeyboardButton("👉 فتح الوصول", callback_data="go_to_step3")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    text = (
+        "داخل القناة:\n"
+        "* تحليل قبل أي صفقة\n"
+        "* خطة كاملة (Entry / SL / TP)\n"
+        "* تحديثات مباشرة خلال جلسات لندن و نيويورك\n\n"
+        "الدخول مفتوح لفترة محدودة ⏳"
     )
-    bot.send_message(message.chat.id, welcome, parse_mode="Markdown", reply_markup=get_format_menu())
+    await query.edit_message_text(text, reply_markup=reply_markup)
+    return STEP_TWO
 
-@bot.message_handler(func=lambda message: True)
-def save_text(message):
-    user_texts[message.chat.id] = message.text
-    bot.send_message(message.chat.id, "Choose a format for your text:", reply_markup=get_format_menu())
+async def step_three(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    keyboard = [[InlineKeyboardButton("👉 دخول القناة", url=CHANNEL_LINK)]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    text = "اضغط للدخول الآن 👇"
+    await query.edit_message_text(text, reply_markup=reply_markup)
+    return ConversationHandler.END
 
-@bot.callback_query_handler(func=lambda call: True)
-def handle_format(call):
-    chat_id = call.message.chat.id
-    original = user_texts.get(chat_id)
+if __name__ == '__main__':
+    if not TOKEN:
+        print("Error: No BOT_TOKEN found in environment variables.")
+        exit(1)
 
-    if call.data == "fmt_help":
-        bot.answer_callback_query(call.id)
-        bot.send_message(chat_id, "Type your sentence first, then click a button to change how the letters look!")
-        return
-
-    if not original:
-        bot.answer_callback_query(call.id, "Please send some text first!", show_alert=True)
-        return
-
-    bot.answer_callback_query(call.id, "Processing...")
-
-    if call.data == "fmt_upper":
-        result = original.upper()
-    elif call.data == "fmt_lower":
-        result = original.lower()
-    elif call.data == "fmt_title":
-        result = original.title()
-    elif call.data == "fmt_swap":
-        result = original.swapcase()
-
-    bot.send_message(chat_id, f"✅ *Formatted Text:*\n\n`{result}`", parse_mode="Markdown")
-
-bot.polling()
+    app = ApplicationBuilder().token(TOKEN).build()
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler('start', start)],
+        states={
+            STEP_ONE: [CallbackQueryHandler(step_two, pattern='^go_to_step2$')],
+            STEP_TWO: [CallbackQueryHandler(step_three, pattern='^go_to_step3$')],
+        },
+        fallbacks=[CommandHandler('start', start)],
+    )
+    app.add_handler(conv_handler)
+    print("Bot is running...")
+    app.run_polling()
