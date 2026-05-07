@@ -1,0 +1,9 @@
+services:
+  - type: worker
+    name: purewrite-bot
+    env: python
+    plan: free
+    runtime: python
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
